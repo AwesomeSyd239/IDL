@@ -1,6 +1,6 @@
 @'/home/ullrich/syd/sydTools.pro'
 ;+
-;Functions in this file
+;function in this file
 ;PageDef
 ;MakeCT
 ;RGB2Col
@@ -35,7 +35,7 @@
 
 
 ;+
-;CALL:  PageDef,file,psize=psize,divs=divs,perDiv=perDiv,space=space,fsize=fsize
+;CALL,  PageDef,file,psize=psize,divs=divs,perDiv=perDiv,space=space,fsize=fsize
 ;file   str   File name to save as
 ;psize  [x,y] Size of page {7.5,10}
 ;divs   [x,y] Number of areas to split the page into
@@ -48,7 +48,7 @@
 ;border [num] Margins of the page left,top,right,bottom {[space[0],space[1],space[0]/1.2,space[1]]}
 ;cct    bool  Custom Color Table?
 ;-
-Function PageDef,file,psize=psize,divs=divs,perDiv=perDiv,$
+function PageDef,file,psize=psize,divs=divs,perDiv=perDiv,$
   space=space,fsize=fsize,order=order,border=border,cct=cct,thick=thick
   common comPage,page,pageLabel
   if ~KEYWORD_SET(psize) then psize=[7.5,10]
