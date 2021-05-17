@@ -1,4 +1,5 @@
 ;+
+;This is a modification of the IGRFCompute function to make it run in parallel for many lat/lons at once
 ;r should be in earth radii
 ;-
 Function syd_igrf_compute,r,clats,lons,pv,dp
