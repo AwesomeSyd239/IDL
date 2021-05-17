@@ -34,7 +34,7 @@
 ;removed keepgate from help (definitely broken in V4). It works as a 'coll' paramater now.
 ;removed mutli-radar ability (It might have screwed up BEP in old versions if radars had different params, not sure)
 ;-
-Function GetDaysV5,years,radar,$
+function GetDaysV5,years,radar,$
   months=months,$
   doShift=doShift,$
   ground=ground,$
