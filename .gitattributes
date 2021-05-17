@@ -1,0 +1,3 @@
+#I think this should make github see all the code as IDL
+#Got it from: https://github.com/github/linguist/blob/master/docs/overrides.md
+*.pro linguist-language=IDL
