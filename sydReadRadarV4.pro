@@ -11,6 +11,7 @@
 ;MakeFit2IDL
 ;GetBZ (for bzipped files)
 ;-
+@'/home/ullrich/syd/startup.pro'
 @'/home/ullrich/syd/sydRadStructs.pro'
 @'/home/ullrich/syd/sydReadVecs.pro'
 @'/home/ullrich/syd/GetFilesV4.pro'
@@ -151,7 +152,6 @@ Pro SetUp,fitfp,type,ranges,dats,scls,n_rec,fit1
   endif else if type eq 'acf' then begin ;rst way
     dumb=fitRead(fitfp, prm, fit1)
     if dumb lt 0 then begin
-      PRINT,'problem!'
       n_rec=-1
       RETURN
     endif
@@ -212,8 +212,8 @@ PRO ForceFitToDay,dats,scls,count
     dats=dats[goodInd]
     scls=scls[goodInd]
   endif
-  PRINT,STRING(form="%-i_%-i has nrang= %i and %-i base, %-i total, %-i good, and %-i bad points",$
-    month,day,scls[0].nrang,nd,nd+nx,count,c1)
+  ;  PRINT,STRING(form="%-i_%-i has nrang= %i and %-i base, %-i total, %-i good, and %-i bad points",$
+  ;    month,day,scls[0].nrang,nd,nd+nx,count,c1)
 END
 
 ;+
@@ -247,9 +247,9 @@ FUNCTION sydReadFit,file=file,type=type,dats=dats,scls=scls,verb=verb,cworks=cwo
     dats=[dats,REPLICATE(fit1,n_rec)]
     if type eq 'acf' or type eq 'fit' then scls=[scls,REPLICATE(prm,n_rec)]
     PRINT,!error_state.msg
-    if lim gt 4*n_rec then begin
+    if lim gt (n_rec*4L) then begin
       CATCH,/cancel;break for real problems
-      print,"Giving up"
+      PRINT,"Giving up"
       goto, cls
     endif
 
@@ -264,14 +264,8 @@ FUNCTION sydReadFit,file=file,type=type,dats=dats,scls=scls,verb=verb,cworks=cwo
       dats[count]=fit1
       scls[count]=prm
       count+=1
-      if count ge lim then MESSAGE,'too big';begin ;Expand arrays if needed
-      ;dats=[dats,REPLICATE(fit1,n_rec)]
-      ;scls=[scls,REPLICATE(prm,n_rec)]
-      ;lim+=n_rec
-      ;if count ge 8*lim then  message,'file massively exceeds normal size, please check'
-      ;  break
-      ;endif
-      ;endif
+      if count ge lim then MESSAGE,$
+        STRING(FORM='filled entry %i',count-1);begin ;Expand arrays if needed
     endwhile
     'fit': while oldfitread(fitfp,prm,fit) gt -1 do begin
       STRUCT_ASSIGN, fit, fit1
@@ -302,7 +296,7 @@ FUNCTION sydReadFit,file=file,type=type,dats=dats,scls=scls,verb=verb,cworks=cwo
         lim+=n_rec
       endif
     endwhile
-  endcase else PRINT,file+' had problem'
+  endcase else PRINT,file+' had nrec<0'
 
   cls:
   if type ne 'vec' then dats=dats[0:count-1] ;Trims off empty data
@@ -434,24 +428,28 @@ END
 
 ;+
 ;The purpose is to take in a buinch of 2 hour ACF and make a full day of data
+;for day=0,31 do fn[day]=AssembleFitCon(files=file_search(STRING(FORM='/data/fitacf_30/2016/05/201605%02i.*cve.*',day)),radn='cve',/toidl)
 ;-
-Function AssembleFitCon,fdat=fdat,fscl=fscl,files=files,toidl=toidl,radn=radn,noAsk=noAsk
+Function AssembleFitCon,fdat=fdat,fscl=fscl,files=files,toidl=toidl,radn=radn,pick=pick
   if ~ISA(files) then begin
     if ~ISA(radn) then MESSAGE,'need some input'
     ;files=Get2hrFilesFromMaxwell(radn)
     d2u=['/home/ullrich/syd/data/fitcon/','/data/fitacf_30/']
-    files=GetDayFile(0,radn,verb=1,noAsk=noAsk)
+    files=GetDayFile(0,radn,verb=1,pick=pick)
+   ; files=GetFilesV4(d2u,radn)
   endif
+  if KEYWORD_SET(findDate) then datefromstr,FILE_BASENAME(files[0]);still has trailing string, but DateFromString ignores
   if TOTAL(STRCMP(files,'')) then RETURN,0
-  bzp=WHERE(files.endswith('bz2'),bzcnt)
-  if bzcnt ne 0 then begin
-    getbz2acf,files[bzp],outfiles,outdir='/home/ullrich/syd/data/fitcon/',verb=1
-    files[bzp]=outfiles
-  endif
+  ;bzp=WHERE(files.endswith('bz2'),bzcnt)
+  ;if bzcnt ne 0 then begin
+  ;  getbz2acf,files[bzp],outfiles,outdir='/home/ullrich/syd/data/fitcon/',verb=1
+;    files[bzp]=outfiles
+;  endif
   if ~ISA(radn) then begin
     base=FILE_BASENAME(files[0])
     radn=base.extract('[a-z]+')
   endif
+  uncompressFiles,files,radn
   if N_ELEMENTS(files) eq 1 then if files.endswith('idl') then begin
     PRINT,files+' is already done'
     RETURN,files
@@ -465,12 +463,13 @@ Function AssembleFitCon,fdat=fdat,fscl=fscl,files=files,toidl=toidl,radn=radn,no
     ;todo make this actually read the data
     if good then fdat=[fdat,dats]
     if good then fscl=[fscl,scls]
-    if good then pts+=pt
+    if good then pts+=pt else PRINT,"AssembleFitCon format changed mid-day"
     ;todO hope that these are sorted nicely without duplicate data
     ; could use forcefittoday in sydReadradarV4, maybe
   endforeach
   if KEYWORD_SET(toidl) then begin
     PRINT,'squeezing'
+    forcefittoday,fdat,fscl,pts
     fit=Squeeze('fit',pts,fdat,fscl)
     fname=STRJOIN([MakePathV4('/home/ullrich/syd/data/fitidl/',radn,/MAKE),'.idl'])
     save,fit,filename=fname
@@ -480,7 +479,7 @@ Function AssembleFitCon,fdat=fdat,fscl=fscl,files=files,toidl=toidl,radn=radn,no
   RETURN,pts
 END
 
-PRO AssembleManyFitCon2IDL,radn,yr,mo,dy
+PRO AssembleManyFitCon2IDL,radn,yr,mo,dy,tarNow=tarNow
   common SingleDate,year,month,day
   stt=SYSTIME(/seconds)
   fnames=[]
@@ -489,13 +488,21 @@ PRO AssembleManyFitCon2IDL,radn,yr,mo,dy
   foreach d,dy do begin
     SetDate,yr=yr,mo=mo,dy=d
     PRINT,'working on '+ymdstr()
-    gotten=AssembleFitCon(radn=radn,/toidl,noAsk=noAsk)
+    files=FILE_SEARCH('/data/fitacf_30/'+ymfold()+ymdstr()+'.*'+radn+'.*')
+    gotten=AssembleFitCon(files=files,radn=radn,/toidl)
     if gotten then fnames=[fnames,gotten]
   endforeach
   PRINT,SYSTIME(),SYSTIME(/seconds)-stt
-  localFolder="/home/ullrich/syd/data/fitidl/"+ymFold(/notDir)
-  Tar=STRING(format='%s.%s.tar.gz',localFolder,radn)
-  PRINT,'tarring'
-  sydTar,fnames,tar
+  if KEYWORD_SET(tarNow) then begin;make this bit optional so i can do sets of days
+    ;to work around bad files
+    if tarNow eq 1 then tarThese,fnames
+    if STRCMP(tarNow,radn) then tarThem,radn
+  endif
+end
+pro tarthese,radn,yr=yr,mo=mo
+  if ISA(yr) and ISA(mo) then setdate,yr=yr,mo=mo,dy=1
+  if ISA(radn,/string,/array) then fnames=radn $
+  else fnames=FILE_SEARCH("/home/ullrich/syd/data/fitidl/"+ymFold()+"*"+radn+".fit.idl")
+  sydTar,fnames,"/home/ullrich/syd/data/fitidl/"+ymFold(/notDir)+"."+radn+".tar.gz"
   FILE_DELETE,fnames,/allow
 end

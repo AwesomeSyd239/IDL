@@ -77,6 +77,58 @@ Function Max20,p2u,nt,ng
   RETURN,centermass
 END
 
+Function SkipDist,yr,rad,tag=tag,scale=scale,mnths=mnths
+  common SingleDate
+  SetDate,yr=yr
+  if ISA(rad,/STRING) then rad=RadParseV3(rad)
+  ;rad.gates=[0,75]
+  gates=[rad.gates[0]:rad.gates[-1]]
+  beams=[rad.beams[0]:rad.beams[-1]]
+  @'/home/ullrich/syd/sydCommonV2.pro'
+
+  if ~KEYWORD_SET(scale) then scale=.7
+  if ~KEYWORD_SET(mnths) then mnths=[1:12]
+
+  file_ps=plot_dir+'EchoMonths'+s+'SkipDist'+rad.name+STRING(format='%i',year) ;plot file name
+  page=PageDef(file_ps+(ISA(tag)?tag:''),divs=[1,2],space=[1,1],perdiv=[2,1])
+  ;screenplot,divs=[3,4]
+  foreach month,mnths do begin
+    SetDate,yr=year,mo=month,dy=15
+    RESTORE,STRING(FORMAT='%sdata/echos/%i/r%s_m%02i',this_dir,year,rad.name,month)
+
+    firstgate=INTARR([N_ELEMENTS(gates),2,96,2])
+    foreach b,beams do for d=0,N_ELEMENTS(echocount[0,0,0,0,*])-1 do for f=0,1 do for t=0,95 do begin
+      min2look=10+5*(t lt 44 or t ge 92)
+      fis=MIN(WHERE(echocount[min2look:*,b,f,t,d] ne 0,ci))+min2look
+      fgs=MIN(WHERE(groundcount[min2look:*,b,f,t,d] ne 0,cg))+min2look
+      ;print,STRING(FORM="gs:%i is:%i, b:%i, f:%i ,t:%i, d:%i",fgs,fis,b,f,t,d)
+      firstgate[fis,f,t,0]+=(ci ne 0)
+      firstgate[fgs,f,t,1]+=(cg ne 0)
+    endfor
+    ;todo: mark this line for future syd to find the time shift
+    doShift=0
+    ;ep=doshift?SHIFT(ec/sc,[0,0,4*rad.time]):(ec/sc)
+    endString=' Approximate First Echo Distance in '+dateString(year=year,month=month,sep=' ')
+    xtit=(doShift?"Local":"Universal")+" Time"
+    for freq=0,1 do begin
+      MHz=10+2*freq
+      fs=STRING(FORM='%i MHz ',Mhz)
+      experString=STRING(FORM="based on %-i samples, using beams:%-i-%-i",TOTAL(scancount[beams,freq,*,*]),rad.beams[0],rad.beams[-1])
+      for isg=0,1 do begin;isGround
+        p=MakePlot(xd=times,yd=gates,title="experiment "+(isg?"Ground":"Sky"),xtit=xtit,ytit="Gates")
+        pixelplot,transpose(REFORM(firstgate[*,freq,*,isg])),levs=levs,/nonorm,xi=times,yi=gates
+      endfor
+      ;TraceEchoBand,plotdata,peak,near,far,/drawNow
+      ColBar,p,levs,scale=.75,form='%-i',place=[1.2,1]
+
+      XYOUTS,.5,freq*.45+.505,STRUPCASE(rad.name)+(freq?' HF':' LF')+endString,/normal,align=0.5,charsiz=1.5
+      XYOUTS,.5,freq*.45+.48,experString,/normal,align=0.5,charsiz=1.3
+    endfor
+  endforeach
+  closepage
+END
+
+
 PRO GetTheRayTrace
   common SingleDate
   DefineRTExtras,yr=year,mo=month,dy=15,ra='rkn',bm=5

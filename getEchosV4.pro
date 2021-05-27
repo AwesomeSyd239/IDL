@@ -2,7 +2,7 @@
 @'/home/ullrich/syd/GetFilesV4.pro'
 @'/home/ullrich/syd/filterarrsV3.pro'
 ;@'/home/ullrich/syd/radParseV3.pro'
-;@'/home/ullrich/syd/sydReadRadarV4.pro'
+@'/home/ullrich/syd/sydReadRadarV4.pro'
 ;@'/home/ullrich/syd/sydElev.pro'
 
 
@@ -19,14 +19,14 @@ Function NeedsMake,file,tag=tag,rad,freqs
   forcefittoday,dats,scls
 
   ret=FLTARR(51,16,2,96);51 gates by 16 beams by 2 freq by 96 times
-  if ~isa(freqs) then freqs=[8,11,14]
+  if ~ISA(freqs) then freqs=[8,11,14]
   if MAX(freqs) lt 1000 then freqs*=1000
   ;Filter out unwanted beams
-  tags=tag_names(dats[0])
-  tagInd=where(strmatch(tags,tag,/fold),cnt)
+  tags=TAG_NAMES(dats[0])
+  tagInd=WHERE(STRMATCH(tags,tag,/fold),cnt)
   if cnt eq 0 then begin
-    print,tags
-    return,tags
+    PRINT,tags
+    RETURN,tags
   endif
   t=getTime('acf',scls)
   val=dats.(tagInd) ;discard all info other than the requested
@@ -80,15 +80,15 @@ PRO GetMonthDat,toGet,rad
   year=2016
   month=3
   files=GetFiles(dirPref,rad.name,year,month)
-  power=fltarr([51,16,2,96,n_elements(files)])
-  if strcmp('power',toget,/fold) then tag='pwr0'
+  power=FLTARR([51,16,2,96,N_ELEMENTS(files)])
+  if STRCMP('power',toget,/fold) then tag='pwr0'
   page=pageDef(plot_dir+'MonthPower',perdiv=[1,3])
-  ;screenplot  
+  ;screenplot
   foreach f,files,fi do begin
     a=needsmake(f,tag=tag,rad)
     power[*,*,*,*,fi]=a
     p=makeplot(xr=[0,24],yr=[0,50],title=STRING(FORM='12 MHz beam 7, day %02i',fi))
-    pixelplot,transpose(alog10(reform(a[*,7,1,*]))),x=[0:24:.25],clip=[0,6],/leg
+    pixelplot,TRANSPOSE(ALOG10(REFORM(a[*,7,1,*]))),x=[0:24:.25],clip=[0,6],/leg
   endforeach
   saveName=STRING(FORMAT='%sdata/%s/%s%04i%02i',this_dir,toGet,rad.name,year,month)
   save,power,file=saveName
@@ -110,6 +110,7 @@ END
 ;   +4 announces start as well as end
 ;
 ;GetEchos,years=[2008:2017],/forceRun,/verb,/noask,radars=['inv','cly','rkn'],toGet='vel'
+;TODO:fix the cve saves to actually contain all beams, because they are currently clipped 0-16
 ;-
 PRO GetEchos,years=years,months=months,forceRun=forceRun,$
   verb=verb,noask=noask,radars=radars,toGet=toGet,fileverb=fileverb,gates=gates
@@ -131,14 +132,14 @@ PRO GetEchos,years=years,months=months,forceRun=forceRun,$
   freqs=[8e3,11e3,18e3] ;normally upper limit is 14
 
   ;We will need these sooner or laters
-  if keyword_set(gates) then radars.gates=gates
+  if KEYWORD_SET(gates) then radars.gates=gates
   ngates=MAX(radars.gates[1]-radars.gates[0])+1
   nbeams=MAX(radars.beams[1]-radars.beams[0])+1
   ntimes=N_ELEMENTS(times)
   nfreqs=N_ELEMENTS(freqs)-1
   nrads=N_ELEMENTS(radars)
 
-  dirPref=[this_dir+'data'+s+'fitidl'+s,this_dir+'data'+s+'fitcon'+s];,s+'data'+s+'fitcon'+s]
+  dirPref=[this_dir+'data'+s+'fitidl'+s];,this_dir+'data'+s+'fitcon'+s];,s+'data'+s+'fitcon'+s]
   for yr=0,N_ELEMENTS(years)-1 do begin
     year=years[yr]
     saveDir=STRING(FORMAT='%sdata/%s/%i/',this_dir,toGet,year)
@@ -170,7 +171,7 @@ PRO GetEchos,years=years,months=months,forceRun=forceRun,$
         for day=0,NumDays[month-1]-1 do begin ;Loop over days
           if files[day] eq 'GetFile_Nothing' then continue
           if types[day] eq 'acf' or types[day] eq 'fit' then begin
-            message,"run makeFit2IDL first"
+            MESSAGE,"run makeFit2IDL first"
             if STRCMP(toGet,'phase',/FOLD) then begin
               a=needsMake(files[day],type=types[day],radars[rad],freqs)
               phi[*,*,*,*,day]=a
@@ -189,14 +190,14 @@ PRO GetEchos,years=years,months=months,forceRun=forceRun,$
               gatBounds=[radars[rad].gates[0],radars[rad].gates[1]],$
               bmnBounds=radars[rad].beams,frqBounds=[freqs[fr],freqs[fr+1]])
             if a eq 0 then begin
-              print,STRING(FORM='bad echos %s, freq %i',files[day],fr)
+              PRINT,STRING(FORM='bad echos %s, freq %i',files[day],fr)
             endif
             if STRCMP(toGet,'echos',/FOLD) then begin
               if MAX(scans) gt 255 then begin
-                scancount=uint(scancount)
-                echoCount=uint(echoCount)
-                groundCount=uint(groundCount)
-                print,size(scancount)
+                scancount=UINT(scancount)
+                echoCount=UINT(echoCount)
+                groundCount=UINT(groundCount)
+                PRINT,SIZE(scancount)
                 PRINT,radars[rad].name,STRING(FORMAT="day %i Has too many scans for byte",day)
               endif
               scanCount[*,fr,*,day]=scans
@@ -229,3 +230,23 @@ PRO GetEchos,years=years,months=months,forceRun=forceRun,$
   PRINT,files
   done:
 END
+
+pro resave4comp,rads,year
+  saveDir=STRING(FORMAT='/home/ullrich/syd/data/echos/%04i/',year)
+  if ~FILE_TEST(saveDir) then FILE_MKDIR, saveDir
+  foreach radn,rads do for month=1,12 do begin
+    if ~ISA(radn,/string) then radn=radn.name
+    saveName=saveDir+STRING(FORMAT='r%s_m%02i',radn,month)
+    if FILE_TEST(savename) then begin
+      fi=FILE_INFO(savename)
+      if fi.size>5.e6 then begin
+        PRINT,'compressing '+savename
+        RESTORE,savename
+        save,echoCount,groundCount,scanCount,FILENAME=saveName,/compress
+      endif else PRINT,'skipping '+savename+' because it is small'
+    endif
+    echoCount=!null
+    groundcount=!null
+    scancount=!null;make sure to clear these between files
+  endfor
+end

@@ -168,7 +168,10 @@ Function GetFilesV4,dirPref,radars,yearin,months,days,$
   noask=noask,verb=verb,tarCount=tarCount,noZip=noZip
   @'/home/ullrich/syd/sydCommonV2.pro'
   common SingleDate,year,month,day
-  setDate,yr=yearin,mo=months[0],dy=1;might need to initialize SingleDate
+  if ISA(yearin) then setDate,yr=yearin,mo=months[0],dy=1 else begin;might need to initialize SingleDate
+    yearin=year;get from the singleDate block
+    months=month
+  endelse
   if ~KEYWORD_SET(noAsk) then noask=0
   if ~ISA(dirpref,/str) then dirPref=DefaultDir()
   if ~ISA(verb) then verb=0
@@ -189,8 +192,8 @@ Function GetFilesV4,dirPref,radars,yearin,months,days,$
   ;Clean up unwanted files from a tar
   if ISA(tarNames) then foreach tn,tarNames do begin
     a=WHERE(STRMATCH(files,tn),cnt); i guess this will kill tars if things are weird?
-    if cnt ne 1 then message,'something strange';FILE_DELETE,tn,/allow ;Stop leaving idl files laying around
-   ; comps[a]=1 idk why this was here
+    if cnt ne 1 then MESSAGE,'something strange';FILE_DELETE,tn,/allow ;Stop leaving idl files laying around
+    ; comps[a]=1 idk why this was here
   endforeach
 
   missing=(files eq '')
@@ -204,25 +207,31 @@ Function GetFilesV4,dirPref,radars,yearin,months,days,$
     TOTAL((types eq 'idl')*(comps eq 0)),TOTAL((types eq 'idl')*(comps eq 1)),$
     TOTAL((types eq 'acf')*(comps eq 0)),TOTAL(comps eq 1),TOTAL(comps eq 2),$
     TOTAL(types eq 'red'),TOTAL(types eq 'ing'))
+  if total(comps) ne 0 then uncompressFiles,files,radars,comps
+  RETURN,files
+END
 
-  compInd=WHERE(comps ne 0,ccnt)
+pro uncompressFiles,files,radars,comp
+  if ~ISA(comps) then getMeta,files,types,comp=comp
+  compInd=WHERE(comp ne 0,ccnt)
   if ccnt ne 0 and ~KEYWORD_SET(noZip) then begin
     source=files
     PRINT,'Unzipping starts:', SYSTIME(0)
+    s=path_sep()
+    this_dir='/home/ullrich/syd/'
     dbl=WHERE(this_dir.endswith(s)*files.startswith(s),cdb);prevent double file sep
     if cdb ne 0 then files[dbl]=files[dbl].remove(0,0)
-    files[compind]=this_dir+files[compind].remove(-2-comps[compind])
+    files[compind]=this_dir+files[compind].remove(-2-comp[compind])
     outDir=FILE_DIRNAME(files[compind[0]])
     FILE_MKDIR,outdir
-    gzp=WHERE(comps eq 1,gzc)
-    bzp=WHERE(comps eq 2,bzc)
+    gzp=WHERE(comp eq 1,gzc)
+    bzp=WHERE(comp eq 2,bzc)
     if bzc ne 0 then getbz2acf,source[bzp],files[bzp]
     if gzc ne 0 then foreach gzi,gzp do sydGZIP_COMPRESS, source[gzi],files[gzi],/UNCOMPRESS;,/verbose
     PRINT,'Done copy/dezip at',SYSTIME(0)
     ;Check that they went
-    files=GetFilesV4(dirPref,radars,year,months,days,/noask,/noZip)
-  endif
-  RETURN,files
+;should never be needed    files=GetFilesV4(dirPref,radars,/noask,/noZip)
+  endif else PRINT,"All files are uncompressed"
 END
 
 PRO Squish,years,radn
@@ -232,7 +241,7 @@ PRO Squish,years,radn
     fullStr=data_dir+STRING(FORM="vel/%4i/",year)
     filesIn=FILE_SEARCH(fullStr+'r'+radn+'*')
     fileOut=fullStr+STRING(FORM="%4i.%s.tar.gz",year,radn)
-    if n_elements(filesin) ne 12 then message,"could not find files"
+    if N_ELEMENTS(filesin) ne 12 then MESSAGE,"could not find files"
     if ~FILE_TEST(fileOut) then begin
       sydtar,filesIn,fileOut,/gzip
       if FILE_TEST(fileOut) then begin

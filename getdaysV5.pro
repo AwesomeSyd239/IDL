@@ -34,7 +34,7 @@
 ;removed keepgate from help (definitely broken in V4). It works as a 'coll' paramater now.
 ;removed mutli-radar ability (It might have screwed up BEP in old versions if radars had different params, not sure)
 ;-
-function GetDaysV5,years,radar,$
+Function GetDaysV5,years,radar,$
   months=months,$
   doShift=doShift,$
   ground=ground,$
@@ -81,7 +81,6 @@ function GetDaysV5,years,radar,$
       endelse
       told=0
 
-
       if KEYWORD_SET(doShift) then begin
         echoCount=SHIFT(echocount,[0,0,0,4*radar.time,0])
         scanCount=SHIFT(scancount,[0,0,4*radar.time,0])
@@ -113,17 +112,18 @@ function GetDaysV5,years,radar,$
 
   scan=REFORM(scan[*,*,*,0:i2-1,*]);,[nfr,96,i2,N_ELEMENTS(radars)])
   ground=REFORM(ground[*,*,*,*,0:i2-1,*])
+  bep=REFORM(BEP[*,*,*,*,0:i2-1,*])
   if total(coll eq 'g') then begin
-    bep/=ng;div by num gates
-    ground/=ng
+    print,"last time this code got called, it was wrong"
+    td=(gate[-1]-gate[0]+1)
+    bep/=td;div by num gates
+    ground/=td
   endif else begin
     fsiz=size(ground,/dim)
     s3=reform(scan,[1,fsiz[1:*]])
     scan=rebin(s3,fsiz);cant rebin in the order i want
   endelse
   if ~KEYWORD_SET(quiet) then PRINT,"GetDays got",i2," total ",res,"s of data"
-  ;if ng gt 1 $
-  ;  then RETURN,REFORM(BEP[*,*,*,0:i2-1,*],[51,nfr,96,i2,N_ELEMENTS(radars)]) else $
-  RETURN,REFORM(BEP[*,*,*,*,0:i2-1,*])
-  ;REFORM(BEP[*,*,0:i2-1,*],[nfr,96,i2,N_ELEMENTS(radars)])
+
+  RETURN,bep
 END
